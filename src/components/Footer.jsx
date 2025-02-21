@@ -9,7 +9,7 @@ const Footer = () => {
         <p>Monday - Friday: 8:00 AM - 17:00 PM</p>
         <p>Saturday: Closed</p>
         <p>Sunday: Closed</p>
-        <div className="flex justify-center space-x-4 mt-4">
+        <div className="flex justify-center space-x-4 mt-4 ">
           <a href="https://www.facebook.com/Garaziukascom" target="_blank" rel="noopener noreferrer"><FaFacebook className="text-blue-600 text-3xl" /></a>
           <a href="https://www.instagram.com/yourpage" target="_blank" rel="noopener noreferrer"><FaInstagram className="text-pink-600 text-3xl" /></a>
           <a href="https://www.twitter.com/yourpage" target="_blank" rel="noopener noreferrer"><FaTwitter className="text-blue-400 text-3xl" /></a>
