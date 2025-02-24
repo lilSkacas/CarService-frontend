@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
@@ -9,8 +9,18 @@ import Contacts from "./pages/Contacts";
 import LoginRegister from "./login/LoginRegister";
 import Profile from "./login/Profile";
 import Contact2 from "./pages/Contact2";
+import AdminPanel from "./admin/AdminPanel";
 
+// Protected Route wrapper for admin routes
+const AdminRoute = ({ children }) => {
+  const isAdmin = localStorage.getItem("role") === "ADMIN";
+  
+  if (!isAdmin) {
+    return <Navigate to="/profile" replace />;
+  }
 
+  return children;
+};
 
 const App = () => {
   return (
@@ -27,6 +37,14 @@ const App = () => {
           <Route path="/login" element={<LoginRegister />}/>
           <Route path="/profile" element={<Profile />}/>
           <Route path="/contact2" element={<Contact2 />}/>
+          <Route 
+            path="/admin" 
+            element={
+              <AdminRoute>
+                <AdminPanel />
+              </AdminRoute>
+            }
+          />
         </Routes>
       </div>
       <Footer />

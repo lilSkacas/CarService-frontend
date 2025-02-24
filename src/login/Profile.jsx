@@ -3,278 +3,447 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
-  const [profileData, setProfileData] = useState({
-    name: "",
+  const navigate = useNavigate();
+  const [userData, setUserData] = useState({
+    username: "",
     email: "",
+    password: "",
     phoneNumber: "",
   });
-
-  const [cars, setCars] = useState([]); // Store multiple cars
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingClient, setIsEditingClient] = useState(false);
+  const [clientData, setClientData] = useState({
+    firstName: "",
+    lastName: "",
+    address: "",
+    city: "",
+    postalCode: "",
+    country: "",
+    companyName: "",
+    phoneNumber: "",
+    additionalNotes: ""
+  });
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    password: "",
+    phoneNumber: "",
+  });
+  const [cars, setCars] = useState([]);
+  const [isAddingCar, setIsAddingCar] = useState(false);
   const [newCar, setNewCar] = useState({
-    licensePlate: "",
     make: "",
     model: "",
     year: "",
-    engine: "",
-    fuel: "",
-    transmission: "",
-    wheelDrive: "",
-    body: "",
   });
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [isAddingCar, setIsAddingCar] = useState(false);
-  const navigate = useNavigate();
-
-  // Fetch Profile Data (e.g., on component mount)
   useEffect(() => {
-    // You can get the user's details from an API here
-    const fetchProfile = async () => {
+    const storedUserData = localStorage.getItem("userData");
+    if (storedUserData) {
+      setUserData(JSON.parse(storedUserData));
+      setFormData(JSON.parse(storedUserData));
+      // Fetch user's cars
+      const fetchCars = async () => {
+        try {
+          const id = Number(localStorage.getItem("id"));
+          const response = await axios.get(`http://localhost:8080/carservice/user/get/${id}`, {
+            headers: {
+              "Authorization": `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+          setCars(response.data.vehicle || []);
+        } catch (error) {
+          console.error("Error fetching cars:", error);
+        }
+      };
+      fetchCars();
+
+      // Fetch client data from Tadabase
+      const fetchClientData = async () => {
+        try {
+          const id = Number(localStorage.getItem("id"));
+          // Replace with your actual Tadabase API endpoint
+          const response = await axios.get(`http://localhost:8080/carservice/client/get/${id}`, {
+            headers: {
+              "Authorization": `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+          setClientData(response.data || {});
+        } catch (error) {
+          console.error("Error fetching client data:", error);
+        }
+      };
+      fetchClientData();
+    } else {
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      const id = Number(localStorage.getItem("id"));
+      const response = await axios.put(`http://localhost:8080/carservice/user/update/${id}`, formData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      localStorage.setItem("userData", JSON.stringify(formData));
+      setUserData(formData);
+      setIsEditing(false);
+      alert("Profile updated successfully!");
+    } catch (error) {
+      console.error("Error updating profile:", error.response?.data || error.message);
+    }
+  };
+
+  const handleClientDataChange = (e) => {
+    setClientData({ ...clientData, [e.target.name]: e.target.value });
+  };
+
+  const handleClientUpdate = async () => {
+    try {
+      const id = Number(localStorage.getItem("id"));
+      // Replace with your actual Tadabase API endpoint
+      await axios.put(`http://localhost:8080/carservice/client/update/${id}`, clientData, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      setIsEditingClient(false);
+    } catch (error) {
+      console.error("Error updating client data:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await axios.post("http://localhost:8080/carservice/auth/logout", null, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      localStorage.clear();
+      navigate("/login");
+    } catch (error) {
+      console.error("Error logging out:", error.response?.data || error.message);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmDelete = window.confirm("Are you sure you want to delete your account?");
+    if (confirmDelete) {
       try {
-        const response = await axios.get("http://localhost:8080/carservice/user/get/{id}", {
+        const id = Number(localStorage.getItem("id"));
+        await axios.delete(`http://localhost:8080/carservice/user/delete/${id}`, {
           headers: {
-            "Authorization": `Bearer ${localStorage.getItem("token")}`, // assuming token is stored
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setProfileData(response.data);
-        setCars(response.data.cars || []);
+        localStorage.clear();
+        alert("Account deleted successfully.");
+        navigate("/login");
       } catch (error) {
-        console.error("Error fetching profile data:", error);
+        console.error("Error deleting account:", error.response?.data || error.message);
       }
-    };
-    fetchProfile();
-  }, []);
+    }
+  };
 
-  // Handle input change
-  const handleChange = (e) => {
-    setProfileData({
-      ...profileData,
-      [e.target.name]: e.target.value,
-    });
+  const handleAddCar = async () => {
+    if (cars.length >= 3) {
+      alert("You can only add up to 3 cars");
+      return;
+    }
+
+    try {
+      const id = Number(localStorage.getItem("id"));
+      const carWithUser = { ...newCar, user: { id } };
+      const response = await axios.post("http://localhost:8080/carservice/vehicle/create", carWithUser, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      setCars([...cars, response.data]);
+      setIsAddingCar(false);
+      setNewCar({ make: "", model: "", year: "", engine: "", fuel: "", transmission: "", wheelDrive: "", body: ""});
+    } catch (error) {
+      console.error("Error adding car:", error);
+    }
+  };
+
+  const handleDeleteCar = async (carId) => {
+    try {
+      await axios.delete(`http://localhost:8080/carservice/vehicle/delete/${carId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      setCars(cars.filter(car => car.id !== carId));
+    } catch (error) {
+      console.error("Error deleting car:", error);
+    }
   };
 
   const handleCarChange = (e) => {
     setNewCar({ ...newCar, [e.target.name]: e.target.value });
   };
 
-  const handleAddCar = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await axios.post(
-        "http://localhost:8080/carservice/user/addCar",
-        newCar,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-      setCars([...cars, response.data]); // Add new car to state
-      setNewCar({ // Reset form
-        licensePlate: "",
-        make: "",
-        model: "",
-        year: "",
-        engine: "",
-        fuel: "",
-        transmission: "",
-        wheelDrive: "",
-        body: "",
-      });
-      setIsAddingCar(false);
-    } catch (error) {
-      console.error("Error adding car:", error);
-    }
-  };
-
-  // Handle form submission to update profile
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await axios.put(
-        "http://localhost:8080/carservice/user/update",
-        profileData,
-        {
-          headers: {
-            "Authorization": `Bearer ${localStorage.getItem("token")}`, // assuming token is stored
-          },
-        }
-      );
-      console.log("Profile updated:", response.data);
-      setIsEditing(false); // exit edit mode
-    } catch (error) {
-      console.error("Error updating profile:", error);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token"); // Remove token from localStorage
-    navigate("/login"); // Redirect to login page (adjust path as needed)
-  };
-
-  // Handle Delete Account
-  const handleDeleteAccount = async () => {
-    try {
-      const response = await axios.delete("http://localhost:8080/carservice/user/delete", {
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      console.log("Account deleted:", response.data);
-      localStorage.removeItem("token"); // Remove token after account is deleted
-      navigate("/signup"); // Redirect to signup page (adjust path as needed)
-    } catch (error) {
-      console.error("Error deleting account:", error);
-    }
-  };
-
-
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Profile</h1>
-      {!isEditing ? (
-        <div>
-          <p><strong>Name:</strong> {profileData.name}</p>
-          <p><strong>Email:</strong> {profileData.email}</p>
-          <p><strong>Phone Number:</strong> {profileData.phoneNumber}</p>
-          <button onClick={() => setIsEditing(true)} className="bg-blue-600 text-white p-1 mt-4 ml-2">
-            Edit Profile
-          </button>
+    <div className="container mx-auto p-10 min-h-screen ">
+      <h1 className="text-3xl font-bold  mb-4">Profile</h1>
+      {isEditing ? (
+        <div className="profile-form">
+          <input
+            type="text"
+            name="username"
+            value={formData.username}
+            onChange={handleInputChange}
+            placeholder="Username"
+          />
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="Email"
+          />
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleInputChange}
+            placeholder="Password"
+          />
+          <input
+            type="text"
+            name="phoneNumber"
+            value={formData.phoneNumber}
+            onChange={handleInputChange}
+            placeholder="Phone Number"
+          />
+          <button onClick={handleProfileUpdate} className="bg-green-600 text-white p-1 mt-4 ml-2" >Save</button>
+          <button onClick={() => setIsEditing(false)} className="bg-blue-600 text-white p-1 mt-4 ml-2">Cancel</button>
         </div>
       ) : (
-        <form onSubmit={handleUpdate} className="mt-4">
-          <div className="mb-4">
-            <label htmlFor="name" className="block">Name</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={profileData.name}
-              onChange={handleChange}
-              className="w-60 p-1 border rounded"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label htmlFor="email" className="block">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={profileData.email}
-              onChange={handleChange}
-              className="w-60 p-1 border rounded"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label htmlFor="phoneNumber" className="block">Phone Number</label>
-            <input
-              type="text"
-              id="phoneNumber"
-              name="phoneNumber"
-              value={profileData.phoneNumber}
-              onChange={handleChange}
-              className="w-40 p-1 border rounded"
-              required
-            />
-           </div>
-          <button type="submit" className="bg-green-900 text-white p-1 mt-2">
-            Save Changes
-          </button>
-          </form>
+        <div className="profile-info">
+          <p><strong>Username:</strong> {userData.username}</p>
+          <p><strong>Email:</strong> {userData.email}</p>
+          <p><strong>Phone Number:</strong> {userData.phoneNumber}</p>
+          <button onClick={() => setIsEditing(true)} className="bg-purple-600 text-white mt-4 rounded">Edit Profile</button>
+        </div>
       )}
-          <button onClick={handleLogout} className="bg-yellow-600 text-white p-1 mt-4 ml-2">
-            Logout
+
+      <div className="bg-opacity-50 p-4 rounded-lg mt-6 mb-4">
+        <div className="flex justify-start items-center mb-4">
+          <h2 className="text-3xl font-bold mr-4">Client Information</h2>
+          <button
+            onClick={() => setIsEditingClient(!isEditingClient)}
+            className="bg-blue-600 text-white p-2 rounded "
+          >
+            {isEditingClient ? "Cancel" : "Edit Client Info"}
           </button>
-          <button onClick={handleDeleteAccount} className="bg-red-900 text-white p-1 mt-4 ml-2">
-            Delete Account
-          </button>
-
-          <h2 className="text-2xl font-bold mt-6">My Cars</h2>
-      <button onClick={() => setIsAddingCar(!isAddingCar)} className="bg-blue-500 text-white p-2 mt-2">
-        {isAddingCar ? "Cancel" : "Add Car"}
-      </button>
-
-      <div className="mt-4">
-        {cars.map((car, index) => (
-          <div key={index} className="border p-3 mb-2 rounded">
-            
-            <label className="block font-semibold">License Plate:</label>
-            <p className="border p-2 rounded">{car.licensePlate}</p>
-
-            <p><strong>Make:</strong> {car.make}</p>
-            <p><strong>Model:</strong> {car.model}</p>
-            <p><strong>Year:</strong> {car.year}</p>
-            <p><strong>Engine:</strong> {car.engine}</p>
-            <p><strong>Fuel:</strong> {car.fuel}</p>
-            <p><strong>Transmission:</strong> {car.transmission}</p>
-            <p><strong>Wheel Drive:</strong> {car.wheelDrive}</p>
-            <p><strong>Body:</strong> {car.body}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Add Car Form */}
-      {isAddingCar && (
-        <form onSubmit={handleAddCar} className="mt-4 border p-4 rounded ">
-          <h3 className="text-xl font-bold mb-4 ml-4">Add New Car</h3>
-
-      <div className="flex-row mb-2 items-center p-2">
-      <input type="text" name="licensePlate" placeholder="License Plate" value={newCar.licensePlate} onChange={handleCarChange} className=" p-1 border rounded w-60 mr-4" required/>
-        <label htmlFor="licensePlate" className="font-semibold">License Plate</label>
-      </div>
-
-        <div className="flex-row mb-2 items-center p-2">
-           <input type="text" name="make" placeholder="Make" value={newCar.make} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required/>
-          <label htmlFor="make" className="font-semibold mr-4">Make</label>
         </div>
 
-          <div className="flex-row mb-2 items-center p-2">
-          <input type="text" name="model" placeholder="Model" value={newCar.model} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required />
-            <label htmlFor="model" className="font-semibold ">Model</label>          
+        {isEditingClient ? (
+          <div className="grid gap-4 w-1/2">
+            <div>
+              <label className="block mb-1">First Name</label>
+              <input
+                type="text"
+                name="firstName"
+                value={clientData.firstName}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-1">Last Name</label>
+              <input
+                type="text"
+                name="lastName"
+                value={clientData.lastName}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-1">Address</label>
+              <input
+                type="text"
+                name="address"
+                value={clientData.address}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-1">City</label>
+              <input
+                type="text"
+                name="city"
+                value={clientData.city}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-1">Postal Code</label>
+              <input
+                type="text"
+                name="postalCode"
+                value={clientData.postalCode}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-1">Country</label>
+              <input
+                type="text"
+                name="country"
+                value={clientData.country}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-1">Company Name</label>
+              <input
+                type="text"
+                name="companyName"
+                value={clientData.companyName}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div>
+              <label className="block mb-1">VAT Number</label>
+              <input
+                type="text"
+                name="vatNumber"
+                value={clientData.vatNumber}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block mb-1">Additional Notes</label>
+              <textarea
+                name="additionalNotes"
+                value={clientData.additionalNotes}
+                onChange={handleClientDataChange}
+                className="w-full p-2 border rounded"
+                rows="3"
+              />
+            </div>
+            <div className="col-span-2">
+              <button
+                onClick={handleClientUpdate}
+                className="bg-green-600 text-white p-2 rounded"
+              >
+                Save Client Information
+              </button>
+            </div>
           </div>
-
-          <div className="flex-row mb-2 items-center p-2">
-            <input type="text" name="year" placeholder="Year" value={newCar.year} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required />
-              <label htmlFor="year" className="font-semibold mr-4">Year</label>
+        ) : (
+          <div className="grid-cols-2 gap-4">
+            <div>
+              <p className="font-semibold">First Name:</p>
+              <p>{clientData.firstName}</p>
+            </div>
+            <div>
+              <p className="font-semibold ">Last Name:</p>
+              <p>{clientData.lastName}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Address:</p>
+              <p>{clientData.address}</p>
+            </div>
+            <div>
+              <p className="font-semibold">City:</p>
+              <p>{clientData.city}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Postal Code:</p>
+              <p>{clientData.postalCode}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Country:</p>
+              <p>{clientData.country}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Company Name:</p>
+              <p>{clientData.companyName}</p>
+            </div>
+            <div>
+              <p className="font-semibold">VAT Number:</p>
+              <p>{clientData.vatNumber}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="font-semibold">Additional Notes:</p>
+              <p>{clientData.additionalNotes}</p>
+            </div>
           </div>
-
-          <div className="flex-row mb-2 items-center p-2">
-            <input type="text" name="engine" placeholder="Engine" value={newCar.engine} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required />
-            <label htmlFor="engine" className="font-semibold mr-4">Engine</label>
-          </div>
-
-          <div className="flex-row mb-2 items-center p-2">
-            <input type="text" name="fuel" placeholder="Fuel" value={newCar.fuel} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required />
-            <label htmlFor="fuel" className="font-semibold mr-4">Fuel</label>
-          </div>
-
-          <div className="flex-row mb-2 items-center p-2">
-            <input type="text" name="transmission" placeholder="Transmission" value={newCar.transmission} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required />
-            <label htmlFor="transmission" className="font-semibold mr-4">Transmission</label>
-          </div>
-
-          <div className="flex-row mb-2 items-center p-2">
-            <input  type="text" name="wheelDrive" placeholder="Wheel Drive" value={newCar.wheelDrive} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required />
-            <label htmlFor="wheel drive" className="font-semibold mr-4">Wheel Drive</label>
-          </div>
-
-          <div className="flex-row mb-2 items-center p-2">
-            <input type="text" name="body" placeholder="Body" value={newCar.body} onChange={handleCarChange} className="w-60 p-1 border rounded mr-4" required />
-            <label htmlFor="mbody" className="font-semibold mr-4">Body</label>
-         </div>
-
-         </form>
-      )}
-        {isAddingCar && (
-          <button type="submit" onClick={handleAddCar} className="bg-green-600 text-white p-2 mt-2 ">
-            Save Car
-          </button>
         )}
+      </div>
+
+      <button onClick={handleLogout} className="bg-yellow-600 text-white p-1 mt-4 ml-2">
+        Logout
+      </button>
+      <button onClick={handleDeleteAccount} className="bg-red-900 text-white p-1 mt-4 ml-2">
+        Delete Account
+      </button>
+
+      <div className="bg-black-600 text-white p-2 mt-10 ml-2 cars-section">
+        <h3>My Cars ({cars.length}/3)</h3>
+        <div className="cars-list">
+          {cars.map((car) => (
+            <div key={car.id} className="car-item">
+              <p>{car.make} {car.model} ({car.year})</p>
+              <button onClick={() => handleDeleteCar(car.id)}>Delete</button>
+            </div>
+          ))}
+        </div>
+
+        {isAddingCar ? (
+          <div className="add-car-form p-4">
+            <input
+              type="text"
+              name="make"
+              placeholder="Make"
+              value={newCar.make}
+              onChange={handleCarChange}
+            />
+            <input
+              type="text"
+              name="model"
+              placeholder="Model"
+              value={newCar.model}
+              onChange={handleCarChange}
+            />
+            <input
+              type="text"
+              name="year"
+              placeholder="Year"
+              value={newCar.year}
+              onChange={handleCarChange}
+            />
+            
+            <button onClick={handleAddCar} className="bg-green-600 text-white p-1 mt-4 ml-2">Save Car</button>
+            <button onClick={() => setIsAddingCar(false)} className="bg-blue-600 text-white p-1 mt-4 ml-2" >Cancel</button>
+          </div>
+        ) : (
+          cars.length < 3 && (
+            <button onClick={() => setIsAddingCar(true)} className="bg-purple-600 text-white p-1 mt-4 ml-2" >Add Car</button>
+          )
+        )}
+      </div>
     </div>
   );
 };
-   
 
 export default Profile;

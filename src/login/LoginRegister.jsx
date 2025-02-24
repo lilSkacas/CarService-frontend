@@ -14,14 +14,37 @@ const LoginRegister = ({ onClose }) => {
 
   const handleLogin = async () => {
     try {
-      const response = await axios.post("http://localhost:8080/carservice/auth/signin", {
+      const loginResponse = await axios.post("http://localhost:8080/carservice/auth/signin", {
         username: formData.username,
         password: formData.password,
       });
-      console.log("Login response:", response.data);
-      navigate("/profile");
+  
+      console.log("Login response:", loginResponse.data);
+  
+      // Extract the necessary data from the login response
+      const { token, id, username, email, phoneNumber, vehicles, role } = loginResponse.data;
+  
+      // Store user data in localStorage
+      localStorage.setItem("userId", id); 
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", role); 
+      localStorage.setItem("userData", JSON.stringify({ 
+        username, 
+        email, 
+        phoneNumber,
+        vehicles: vehicles || [],
+        role 
+      }));
+  
+      // Navigate based on role
+      if (role === "ADMIN") {
+        navigate("/admin");
+      } else {
+        navigate("/profile");
+      }
+      
     } catch (error) {
-      console.error("Error logging in:", error.response?.data || error.message);
+      console.error("Registration or Login Error:", error.response?.data || error.message);
     }
   };
 
@@ -39,7 +62,12 @@ const LoginRegister = ({ onClose }) => {
         phoneNumber: formData.phoneNumber
       });
       console.log("Registration Successful:", response.data);
-      setIsRegister(false); // Switch back to login after successful registration
+      
+      const { id, username, email, phoneNumber } = response.data;
+      localStorage.setItem("userId", id);
+      localStorage.setItem("userData", JSON.stringify({ username, email, phoneNumber }));
+
+      navigate("/profile");
     } catch (error) {
       console.error("Registration Error:", error.response?.data || error.message);
     }
@@ -48,7 +76,7 @@ const LoginRegister = ({ onClose }) => {
   // Handle Password Reset
   const handlePasswordReset = async () => {
     try {
-      const response = await axios.post("http://localhost:8080/carservice/user/reset-password", {
+      const response = await axios.post("http://localhost:8080/carservice/user/resetPassword", {
         email: formData.email,
       });
       console.log("Password Reset Email Sent:", response.data);
